@@ -11,6 +11,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'imageUrl is required' });
   }
 
+  if (!process.env.VERTEX_SERVICE_ACCOUNT_JSON) {
+  return res.status(500).json({ error: 'Missing ENV variable VERTEX_SERVICE_ACCOUNT_JSON' });
+}
+
   try {
     // ✅ Stap 1: Parse de service account JSON uit env var
     const serviceAccount = JSON.parse(process.env.VERTEX_SERVICE_ACCOUNT_JSON);
