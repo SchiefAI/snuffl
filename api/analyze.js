@@ -1,4 +1,3 @@
-// /api/analyze.js
 import { GoogleAuth } from 'google-auth-library';
 
 export default async function handler(req, res) {
@@ -16,22 +15,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 🔐 Service account auth
+    // 👉 Stap 1: Download image
+    const imageRes = await fetch(imageUrl);
+    const arrayBuffer = await imageRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64Image = buffer.toString('base64');
+
+    // 👉 Stap 2: Auth setup
     const serviceAccount = JSON.parse(process.env.VERTEX_SERVICE_ACCOUNT_JSON);
     const auth = new GoogleAuth({
       credentials: serviceAccount,
       scopes: ['https://www.googleapis.com/auth/cloud-platform']
     });
-
     const client = await auth.getClient();
     const accessToken = await client.getAccessToken();
 
-    // 📸 Download en encode image naar base64
-    const imageResponse = await fetch(imageUrl);
-    const imageBuffer = await imageResponse.arrayBuffer();
-    const base64Image = Buffer.from(imageBuffer).toString('base64');
-
-    // 🔁 Vertex predict call
+    // 👉 Stap 3: Vertex AI request
     const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/endpoints/7431481444393811968:predict';
 
     const response = await fetch(endpoint, {
@@ -41,11 +40,7 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${accessToken.token}`
       },
       body: JSON.stringify({
-        instances: [
-          {
-            content: base64Image
-          }
-        ],
+        instances: [{ content: base64Image }],
         parameters: {
           confidenceThreshold: 0.5,
           maxPredictions: 5
@@ -60,9 +55,12 @@ export default async function handler(req, res) {
     }
 
     const prediction = await response.json();
-    return res.status(200).json({ status: 'success', prediction });
-
+    return res.status(200).json({
+      status: 'success',
+      prediction
+    });
   } catch (err) {
+    console.error('❌ Server Error:', err);
     return res.status(500).json({ error: 'Server Error', details: err.message });
   }
 }
