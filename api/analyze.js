@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { imageUrl, userId, email } = req.body;
+  const { imageUrl } = req.body;
   if (!imageUrl) {
     return res.status(400).json({ error: 'imageUrl is required' });
   }
@@ -16,52 +16,53 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ Stap 1: Parse de service account JSON uit env var
+    // 🔐 Service account auth
     const serviceAccount = JSON.parse(process.env.VERTEX_SERVICE_ACCOUNT_JSON);
-
-    // ✅ Stap 2: Auth client opzetten
     const auth = new GoogleAuth({
       credentials: serviceAccount,
-      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+      scopes: ['https://www.googleapis.com/auth/cloud-platform']
     });
 
     const client = await auth.getClient();
     const accessToken = await client.getAccessToken();
 
-    // ✅ Stap 3: Vertex AI endpoint aanroepen
+    // 📸 Download en encode image naar base64
+    const imageResponse = await fetch(imageUrl);
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64Image = Buffer.from(imageBuffer).toString('base64');
+
+    // 🔁 Vertex predict call
     const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/endpoints/7431481444393811968:predict';
 
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken.token}`,
+        Authorization: `Bearer ${accessToken.token}`
       },
       body: JSON.stringify({
         instances: [
           {
-            image_url: imageUrl, // <-- check dat je model deze key verwacht!
-          },
+            content: base64Image
+          }
         ],
-      }),
+        parameters: {
+          confidenceThreshold: 0.5,
+          maxPredictions: 5
+        }
+      })
     });
 
     if (!response.ok) {
-      const errorJson = await response.json();
-      console.error('❌ Vertex full error:', JSON.stringify(errorJson, null, 2));
-      return res.status(response.status).json({
-        error: 'Vertex AI error',
-        details: errorJson,
-      });
+      const errorText = await response.text();
+      console.error('❌ Vertex error response:', errorText);
+      return res.status(response.status).json({ error: 'Vertex AI error', details: errorText });
     }
 
     const prediction = await response.json();
-    return res.status(200).json({
-      status: 'success',
-      prediction,
-    });
+    return res.status(200).json({ status: 'success', prediction });
+
   } catch (err) {
-    console.error('❌ Server error:', err);
     return res.status(500).json({ error: 'Server Error', details: err.message });
   }
 }
