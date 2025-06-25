@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     const accessToken = await client.getAccessToken();
 
     // ✅ Stap 3: Vertex AI API aanroepen
-    const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/publishers/google/models/imagen:predict';
+    const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/models/241898055668858880:predict';
 
     const response = await fetch(endpoint, {
       method: 'POST',
