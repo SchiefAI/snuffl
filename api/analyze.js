@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.VERTEX_API_TOKEN}` // zie stap 2
+        Authorization: `Bearer ${process.env.VERTEX_API_TOKEN}`
       },
       body: JSON.stringify(body)
     });
@@ -39,7 +39,6 @@ export default async function handler(req, res) {
 
     const vertexResult = await response.json();
 
-    // Dit kun je straks verrijken (bijv. beste ras + score extraheren)
     return res.status(200).json({
       status: 'success',
       received: imageUrl,
