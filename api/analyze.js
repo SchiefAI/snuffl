@@ -47,10 +47,11 @@ export default async function handler(req, res) {
       })
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(response.status).json({ error: 'Vertex AI error', details: errorText });
-    }
+   if (!response.ok) {
+  const errorText = await response.text();
+  console.error('❌ Vertex error response:', errorText);
+  return res.status(response.status).json({ error: 'Vertex AI error', details: errorText });
+  }
 
     const prediction = await response.json();
     return res.status(200).json({
