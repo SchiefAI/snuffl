@@ -1,5 +1,6 @@
 // /api/analyze.js
 import { GoogleAuth } from 'google-auth-library';
+import fetch from 'node-fetch';
 import sharp from 'sharp';
 
 export default async function handler(req, res) {
@@ -17,10 +18,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ Stap 1: Parse service account JSON uit env var
-    const serviceAccount = JSON.parse(process.env.VERTEX_SERVICE_ACCOUNT_JSON);
+    const imageResponse = await fetch(imageUrl);
+    const buffer = await imageResponse.buffer();
 
-    // ✅ Stap 2: Auth client opzetten
+    // Resize + compress image to reduce size
+    const resizedBuffer = await sharp(buffer)
+      .resize({ width: 512 }) // of 256, afhankelijk van balans tussen kwaliteit en grootte
+      .jpeg({ quality: 80 })  // pas eventueel aan
+      .toBuffer();
+
+    const base64Image = resizedBuffer.toString('base64');
+
+    const serviceAccount = JSON.parse(process.env.VERTEX_SERVICE_ACCOUNT_JSON);
     const auth = new GoogleAuth({
       credentials: serviceAccount,
       scopes: ['https://www.googleapis.com/auth/cloud-platform']
@@ -29,18 +38,6 @@ export default async function handler(req, res) {
     const client = await auth.getClient();
     const accessToken = await client.getAccessToken();
 
-    // ✅ Stap 3: Haal en resize afbeelding (max 512px breed)
-    const imageResponse = await fetch(imageUrl);
-    const imageBuffer = await imageResponse.arrayBuffer();
-
-    const resizedBuffer = await sharp(Buffer.from(imageBuffer))
-      .resize({ width: 512 }) // pas evt. aan
-      .jpeg({ quality: 80 })
-      .toBuffer();
-
-    const base64Image = resizedBuffer.toString('base64');
-
-    // ✅ Stap 4: Vertex AI endpoint aanroepen
     const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/endpoints/7431481444393811968:predict';
 
     const response = await fetch(endpoint, {
@@ -52,7 +49,9 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         instances: [
           {
-            content: base64Image
+            image: {
+              bytesBase64Encoded: base64Image
+            }
           }
         ]
       })
@@ -60,17 +59,13 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Vertex AI error:', errorText);
       return res.status(response.status).json({ error: 'Vertex AI error', details: errorText });
     }
 
     const prediction = await response.json();
-    return res.status(200).json({
-      status: 'success',
-      prediction
-    });
+    return res.status(200).json({ status: 'success', prediction });
+
   } catch (err) {
-    console.error('❌ Server Error:', err);
     return res.status(500).json({ error: 'Server Error', details: err.message });
   }
 }
