@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { imageUrl, userId, email } = req.body;
+  const { imageUrl } = req.body;
   if (!imageUrl) {
     return res.status(400).json({ error: 'imageUrl is required' });
   }
@@ -17,61 +17,54 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ Auth setup
+    // 🔐 Authenticatie
     const serviceAccount = JSON.parse(process.env.VERTEX_SERVICE_ACCOUNT_JSON);
     const auth = new GoogleAuth({
       credentials: serviceAccount,
-      scopes: ['https://www.googleapis.com/auth/cloud-platform']
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     });
     const client = await auth.getClient();
     const accessToken = await client.getAccessToken();
 
-    // ✅ Download en verklein afbeelding met sharp
-    const response = await fetch(imageUrl);
-    const buffer = await response.arrayBuffer();
-    const imageBuffer = Buffer.from(buffer);
-
-    const resizedBuffer = await sharp(imageBuffer)
-      .resize({ width: 512 }) // pas aan indien nodig
+    // 🖼️ Download en verklein de afbeelding
+    const imageResponse = await fetch(imageUrl);
+    const originalBuffer = await imageResponse.arrayBuffer();
+    const resizedImage = await sharp(Buffer.from(originalBuffer))
+      .resize({ width: 512 })
       .jpeg({ quality: 80 })
       .toBuffer();
 
-    const base64Image = resizedBuffer.toString('base64');
+    const base64Image = resizedImage.toString('base64'); // 🔥 geen stringify of escapes
 
-    // ✅ Vertex AI aanroepen
-    const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/endpoints/7431481444393811968:predict';
+    // 🚀 Vertex AI request
+    const endpoint =
+      'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/endpoints/7431481444393811968:predict';
 
-    const predictionRes = await fetch(endpoint, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken.token}`
+        Authorization: `Bearer ${accessToken.token}`,
       },
       body: JSON.stringify({
         instances: [
           {
-            image: {
-              content: base64Image // 👈 GEEN dubbele quotes!
-            }
-          }
-        ]
-      })
+            content: base64Image,
+          },
+        ],
+      }),
     });
 
-    if (!predictionRes.ok) {
-      const errorText = await predictionRes.text();
-      console.error('❌ Vertex AI error:', errorText);
-      return res.status(predictionRes.status).json({ error: 'Vertex AI error', details: errorText });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Vertex error response:', errorText);
+      return res.status(response.status).json({ error: 'Vertex AI error', details: errorText });
     }
 
-    const prediction = await predictionRes.json();
-    return res.status(200).json({
-      status: 'success',
-      prediction
-    });
-
+    const prediction = await response.json();
+    return res.status(200).json({ status: 'success', prediction });
   } catch (err) {
-    console.error('❌ Server error:', err.message);
+    console.error('💥 Server error:', err);
     return res.status(500).json({ error: 'Server Error', details: err.message });
   }
 }
