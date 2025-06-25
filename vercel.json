@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/analyze.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/analyze",
+      "methods": ["POST"],
+      "dest": "/api/analyze.js"
+    }
+  ]
+}
