@@ -1,15 +1,14 @@
-// /api/analyze.js
 import { GoogleAuth } from 'google-auth-library';
-import sharp from 'sharp';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { imageUrl } = req.body;
+
   if (!imageUrl) {
-    return res.status(400).json({ error: 'imageUrl is required' });
+    return res.status(400).json({ error: 'Missing imageUrl in request body' });
   }
 
   if (!process.env.VERTEX_SERVICE_ACCOUNT_JSON) {
@@ -17,71 +16,69 @@ export default async function handler(req, res) {
   }
 
   try {
-    const serviceAccount = JSON.parse(process.env.VERTEX_SERVICE_ACCOUNT_JSON);
+    // Stap 1: Image downloaden en converteren naar base64
+    const imageResponse = await fetch(imageUrl);
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64 = Buffer.from(imageBuffer).toString('base64');
 
+    // Stap 2: Authenticatie opzetten
+    const serviceAccount = JSON.parse(process.env.VERTEX_SERVICE_ACCOUNT_JSON);
     const auth = new GoogleAuth({
       credentials: serviceAccount,
-      scopes: ['https://www.googleapis.com/auth/cloud-platform']
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     });
 
     const client = await auth.getClient();
     const accessToken = await client.getAccessToken();
 
-    // Afbeelding ophalen en verkleinen naar <= 1MB
-    const response = await fetch(imageUrl);
-    const buffer = await response.arrayBuffer();
+    // Stap 3: Vertex API aanroepen
+    const endpoint = `https://us-central1-aiplatform.googleapis.com/v1/projects/${serviceAccount.project_id}/locations/us-central1/publishers/google/models/imageclassification:predict`;
 
-    const resizedImage = await sharp(Buffer.from(buffer))
-      .resize({ width: 512 })
-      .jpeg({ quality: 80 })
-      .toBuffer();
-
-    const base64 = resizedImage.toString('base64');
-
-    const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/endpoints/7431481444393811968:predict';
-
-    const vertexRes = await fetch(endpoint, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
+        Authorization: `Bearer ${accessToken.token}`,
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         instances: [
           {
-            image: { b64: base64 }
-          }
-        ]
-      })
+            image: {
+              b64: base64,
+            },
+          },
+        ],
+      }),
     });
 
-    if (!vertexRes.ok) {
-      const errorText = await vertexRes.text();
-      console.error('❌ Vertex AI error:', errorText);
-      return res.status(vertexRes.status).json({ error: 'Vertex AI error', details: errorText });
+    const prediction = await response.json();
+
+    // Stap 4: Resultaten analyseren
+    const predictionResult = prediction?.predictions?.[0];
+
+    if (
+      !predictionResult ||
+      !Array.isArray(predictionResult.confidences || predictionResult.scores) ||
+      !Array.isArray(predictionResult.displayNames)
+    ) {
+      return res.status(500).json({ error: 'Invalid prediction structure', details: prediction });
     }
 
-    const prediction = await vertexRes.json();
-    const scores = prediction.predictions?.[0]?.scores;
-
-    // Hondenrassen importeren uit aparte file of hier hardcoden
-    const labels = [...]; // hier jouw lange lijst
-
-    if (!scores || scores.length === 0) {
-      return res.status(500).json({ error: 'No prediction scores received' });
-    }
-
-    const maxIndex = scores.indexOf(Math.max(...scores));
+    const confidences = predictionResult.confidences || predictionResult.scores;
+    const labels = predictionResult.displayNames;
+    const maxIndex = confidences.indexOf(Math.max(...confidences));
     const label = labels[maxIndex] || 'Onbekend';
 
+    // Stap 5: Terugsturen naar client
     return res.status(200).json({
       status: 'success',
       label,
-      confidence: scores[maxIndex],
-      scores
+      confidence: confidences[maxIndex],
+      scores: confidences,
+      labels,
     });
-  } catch (err) {
-    console.error('❌ Server Error:', err);
-    return res.status(500).json({ error: 'Server Error', details: err.message });
+  } catch (error) {
+    console.error('Vertex AI error', error);
+    return res.status(500).json({ error: 'Vertex AI error', details: error.message });
   }
 }
