@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     });
     const client = await auth.getClient();
     const tokenResult = await client.getAccessToken();
-    const accessToken = tokenResult?.token || tokenResult; // fallback if .token not present
+    const accessToken = tokenResult?.token || tokenResult;
 
     // 🖼️ Download & resize image
     const imageRes = await fetch(imageUrl);
@@ -37,20 +37,39 @@ export default async function handler(req, res) {
 
     const base64 = resized.toString('base64');
 
-    // 🔮 Predictie via Vertex AI
+    // 🔮 Vertex AI prediction - FIXED PAYLOAD STRUCTURE
     const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/endpoints/7431481444393811968:predict';
 
+    // ✅ OPTION 1: AutoML Vision format
     const payload = {
       instances: [
         {
-          // ✅ VARIANT A: image.content
-          image: { content: base64 },
-
-          // 🔁 VARIANT B (alternatief): gebruik image_bytes
-          // image_bytes: { content: base64 }
-        },
-      ],
+          content: base64
+        }
+      ]
     };
+
+    // 🔄 OPTION 2: Als Option 1 niet werkt, probeer deze:
+    // const payload = {
+    //   instances: [
+    //     {
+    //       image_bytes: {
+    //         b64: base64
+    //       }
+    //     }
+    //   ]
+    // };
+
+    // 🔄 OPTION 3: Als een custom model, probeer deze:
+    // const payload = {
+    //   instances: [
+    //     {
+    //       bytes_inputs: {
+    //         b64: base64
+    //       }
+    //     }
+    //   ]
+    // };
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -68,25 +87,47 @@ export default async function handler(req, res) {
     }
 
     const result = await response.json();
+    console.log('✅ Vertex AI response:', JSON.stringify(result, null, 2));
+    
     const prediction = result.predictions?.[0];
 
-    if (!prediction || !prediction.confidences || !prediction.displayNames) {
-      return res.status(500).json({ error: 'Invalid prediction format', details: prediction });
+    // Handle different response formats
+    if (prediction) {
+      // AutoML Vision format
+      if (prediction.confidences && prediction.displayNames) {
+        const scores = prediction.confidences;
+        const labels = prediction.displayNames;
+        const maxIndex = scores.indexOf(Math.max(...scores));
+
+        return res.status(200).json({
+          status: 'success',
+          label: labels[maxIndex] || 'Unknown',
+          confidence: scores[maxIndex],
+          top5: labels
+            .map((label, i) => ({ label, confidence: scores[i] }))
+            .sort((a, b) => b.confidence - a.confidence)
+            .slice(0, 5),
+        });
+      }
+      
+      // Custom model format - adapt based on your model's output
+      else if (prediction.classes) {
+        return res.status(200).json({
+          status: 'success',
+          prediction: prediction
+        });
+      }
+      
+      // Generic format
+      else {
+        return res.status(200).json({
+          status: 'success',
+          prediction: prediction
+        });
+      }
     }
 
-    const scores = prediction.confidences;
-    const labels = prediction.displayNames;
-    const maxIndex = scores.indexOf(Math.max(...scores));
-
-    return res.status(200).json({
-      status: 'success',
-      label: labels[maxIndex] || 'Unknown',
-      confidence: scores[maxIndex],
-      top5: labels
-        .map((label, i) => ({ label, confidence: scores[i] }))
-        .sort((a, b) => b.confidence - a.confidence)
-        .slice(0, 5),
-    });
+    return res.status(500).json({ error: 'No prediction found', details: result });
 
   } catch (err) {
     console.error('❌ Server Error:', err);
