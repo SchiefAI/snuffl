@@ -49,7 +49,7 @@ export default async function handler(req, res) {
         instances: [
           {
             image: {
-              b64: base64,
+              content: base64,
             },
           },
         ],
