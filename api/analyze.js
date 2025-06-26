@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     const buffer = await imageRes.arrayBuffer();
     const resized = await sharp(Buffer.from(buffer))
       .resize({ width: 512 })
-      .jpeg({ quality: 80 })
+      .png()
       .toBuffer();
 
     const base64 = resized.toString('base64');
@@ -51,18 +51,19 @@ export default async function handler(req, res) {
     //   ]
     // };
 
-    // ✅ OPTION 2: Alternative AutoML format
+    // ✅ WORKING PAYLOAD! (confirmed via gcloud test)
     const payload = {
       instances: [
         {
           content: base64
         }
-      ],
-      parameters: {
-        confidenceThreshold: 0.5,
-        maxPredictions: 5
-      }
+      ]
     };
+
+    // Debug: Log de payload structuur
+    console.log('🔍 Payload being sent:', JSON.stringify({
+      instances: [{ content: `${base64.substring(0, 50)}...` }]
+    }, null, 2));
 
     const response = await fetch(endpoint, {
       method: 'POST',
