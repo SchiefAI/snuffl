@@ -52,8 +52,7 @@ export default async function handler(req, res) {
           image: { b64: base64 }
         }
       ]
-    })
-    ;
+    }),
 
     if (!vertexRes.ok) {
       const errorText = await vertexRes.text();
