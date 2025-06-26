@@ -37,39 +37,32 @@ export default async function handler(req, res) {
 
     const base64 = resized.toString('base64');
 
-    // 🔮 Vertex AI prediction - FIXED PAYLOAD STRUCTURE
+    // 🔮 Vertex AI prediction - AUTOML VISION FORMAT
     const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/endpoints/7431481444393811968:predict';
 
-    // 🔄 OPTION 1: AutoML Vision format
+    // ✅ CORRECT AutoML Vision payload format
+    const payload = {
+      instances: [
+        {
+          image: {
+            bytesBase64Encoded: base64
+          }
+        }
+      ]
+    };
+
+    // 🔄 Alternative AutoML format if above doesn't work:
     // const payload = {
     //   instances: [
     //     {
     //       content: base64
     //     }
-    //   ]
+    //   ],
+    //   parameters: {
+    //     confidenceThreshold: 0.5,
+    //     maxPredictions: 5
+    //   }
     // };
-
-    // 🔄 OPTION 2: Als Option 1 niet werkt, probeer deze:
-    // const payload = {
-    //   instances: [
-    //     {
-    //       image_bytes: {
-    //         b64: base64
-    //       }
-    //     }
-    //   ]
-    // };
-
-    // ✅ OPTION 3: Als een custom model, probeer deze:
-    const payload = {
-      instances: [
-        {
-          bytes_inputs: {
-            b64: base64
-          }
-        }
-      ]
-    };
 
     const response = await fetch(endpoint, {
       method: 'POST',
