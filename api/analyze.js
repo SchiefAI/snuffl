@@ -49,27 +49,27 @@ export default async function handler(req, res) {
     //   ]
     // };
 
-    // ✅ OPTION 2: Als Option 1 niet werkt, probeer deze:
-    const payload = {
-      instances: [
-        {
-          image_bytes: {
-            b64: base64
-          }
-        }
-      ]
-    };
-
-    // 🔄 OPTION 3: Als een custom model, probeer deze:
+    // 🔄 OPTION 2: Als Option 1 niet werkt, probeer deze:
     // const payload = {
     //   instances: [
     //     {
-    //       bytes_inputs: {
+    //       image_bytes: {
     //         b64: base64
     //       }
     //     }
     //   ]
     // };
+
+    // ✅ OPTION 3: Als een custom model, probeer deze:
+    const payload = {
+      instances: [
+        {
+          bytes_inputs: {
+            b64: base64
+          }
+        }
+      ]
+    };
 
     const response = await fetch(endpoint, {
       method: 'POST',
