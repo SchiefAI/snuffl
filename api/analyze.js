@@ -40,29 +40,29 @@ export default async function handler(req, res) {
     // 🔮 Vertex AI prediction - AUTOML VISION FORMAT
     const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/endpoints/7431481444393811968:predict';
 
-    // ✅ CORRECT AutoML Vision payload format
-    const payload = {
-      instances: [
-        {
-          image: {
-            bytesBase64Encoded: base64
-          }
-        }
-      ]
-    };
-
-    // 🔄 Alternative AutoML format if above doesn't work:
+    // 🔄 OPTION 1: AutoML Vision with bytesBase64Encoded
     // const payload = {
     //   instances: [
     //     {
-    //       content: base64
+    //       image: {
+    //         bytesBase64Encoded: base64
+    //       }
     //     }
-    //   ],
-    //   parameters: {
-    //     confidenceThreshold: 0.5,
-    //     maxPredictions: 5
-    //   }
+    //   ]
     // };
+
+    // ✅ OPTION 2: Alternative AutoML format
+    const payload = {
+      instances: [
+        {
+          content: base64
+        }
+      ],
+      parameters: {
+        confidenceThreshold: 0.5,
+        maxPredictions: 5
+      }
+    };
 
     const response = await fetch(endpoint, {
       method: 'POST',
