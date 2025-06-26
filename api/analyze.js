@@ -17,43 +17,48 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Auth via embedded service account JSON
+    // 🔐 Auth via embedded service account JSON
     const serviceAccount = JSON.parse(process.env.VERTEX_SERVICE_ACCOUNT_JSON);
     const auth = new GoogleAuth({
       credentials: serviceAccount,
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     });
     const client = await auth.getClient();
-    const accessToken = await client.getAccessToken();
+    const tokenResult = await client.getAccessToken();
+    const accessToken = tokenResult?.token || tokenResult; // fallback if .token not present
 
-    // Download & resize image
+    // 🖼️ Download & resize image
     const imageRes = await fetch(imageUrl);
     const buffer = await imageRes.arrayBuffer();
     const resized = await sharp(Buffer.from(buffer))
-      .resize({ width: 512 }) // kleiner voor betere performance
+      .resize({ width: 512 })
       .jpeg({ quality: 80 })
       .toBuffer();
 
     const base64 = resized.toString('base64');
 
-    // Vertex AI predictie-endpoint
+    // 🔮 Predictie via Vertex AI
     const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/endpoints/7431481444393811968:predict';
+
+    const payload = {
+      instances: [
+        {
+          // ✅ VARIANT A: image.content
+          image: { content: base64 },
+
+          // 🔁 VARIANT B (alternatief): gebruik image_bytes
+          // image_bytes: { content: base64 }
+        },
+      ],
+    };
 
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken.token}`,
+        Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({
-        instances: [
-          {
-            image: {
-              content: base64,
-            },
-          },
-        ],
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
