@@ -40,25 +40,25 @@ export default async function handler(req, res) {
     // 🔮 Vertex AI prediction - FIXED PAYLOAD STRUCTURE
     const endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/projects/elated-pathway-441608-i1/locations/us-central1/endpoints/7431481444393811968:predict';
 
-    // ✅ OPTION 1: AutoML Vision format
-    const payload = {
-      instances: [
-        {
-          content: base64
-        }
-      ]
-    };
-
-    // 🔄 OPTION 2: Als Option 1 niet werkt, probeer deze:
+    // 🔄 OPTION 1: AutoML Vision format
     // const payload = {
     //   instances: [
     //     {
-    //       image_bytes: {
-    //         b64: base64
-    //       }
+    //       content: base64
     //     }
     //   ]
     // };
+
+    // ✅ OPTION 2: Als Option 1 niet werkt, probeer deze:
+    const payload = {
+      instances: [
+        {
+          image_bytes: {
+            b64: base64
+          }
+        }
+      ]
+    };
 
     // 🔄 OPTION 3: Als een custom model, probeer deze:
     // const payload = {
