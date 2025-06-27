@@ -1,31 +1,17 @@
-import { useState } from 'react';
-import Hero from '../components/Hero';
-import { Typography, Container, Card, CardMedia, CardContent } from '@mui/material';
+// pages/index.tsx
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
 
+/**
+ * Home = niets meer dan een redirect naar /preview.
+ * Houd deze file zo licht mogelijk; echte UI staat in pages/preview.js
+ */
 export default function Home() {
-  const [file, setFile] = useState<File | null>(null);
+  const router = useRouter();
 
-  return (
-    <>
-      <Hero onUpload={setFile} />
+  useEffect(() => {
+    router.replace('/preview');
+  }, [router]);
 
-      {file && (
-        <Container sx={{ mt: 4 }}>
-          <Card sx={{ maxWidth: 400, mx: 'auto' }}>
-            <CardMedia
-              component="img"
-              height="240"
-              image={URL.createObjectURL(file)}
-              alt="Preview"
-            />
-            <CardContent>
-              <Typography variant="subtitle1">
-                Ziet er goed uit? Je kunt nu doorgaan met het profiel.
-              </Typography>
-            </CardContent>
-          </Card>
-        </Container>
-      )}
-    </>
-  );
+  return null;              // laat geen content zien tijdens redirect
 }
